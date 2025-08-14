@@ -471,13 +471,19 @@ class TabSequencer {
     constructor(audioEngine) {
         this.audioEngine = audioEngine;
         this.isPlaying = false;
-        this.currentPosition = 0;
+        this.isPaused = false;
+        this.currentBeat = 0;
         this.tempo = 120; // BPM
         this.tabData = null;
-        this.scheduledEvents = [];
+        this.allNotes = []; // All notes with timing info
+        this.playbackTimer = null;
         this.startTime = 0;
+        this.pausedTime = 0; // Time when paused
+        this.totalPausedDuration = 0; // Total time spent paused
         this.onProgressCallback = null;
         this.onCompleteCallback = null;
+        this.isLooping = false;
+        this.totalDuration = 0;
     }
 
     setTabData(tabData) {
@@ -500,75 +506,106 @@ class TabSequencer {
     }
 
     async play() {
-        if (!this.tabData || this.isPlaying) return;
+        if (!this.tabData) return;
         
         await this.audioEngine.ensureAudioContext();
-        
-        // Restore master volume in case it was muted by stop
         this.audioEngine.setMasterVolume(0.3);
         
+        if (this.isPaused) {
+            // Resume from pause
+            this.resume();
+        } else {
+            // Start fresh playback
+            this.startFreshPlayback();
+        }
+    }
+    
+    startFreshPlayback() {
         this.isPlaying = true;
+        this.isPaused = false;
+        this.currentBeat = 0;
         this.startTime = this.audioEngine.audioContext.currentTime;
-        this.currentPosition = 0;
+        this.totalPausedDuration = 0;
         
-        // Schedule all notes
-        this.scheduleAllNotes();
+        // Prepare notes for real-time triggering
+        this.prepareNotes();
         
-        // Start progress tracking
-        this.trackProgress();
+        // Start real-time playback
+        this.startRealtimePlayback();
+    }
+    
+    resume() {
+        this.isPlaying = true;
+        this.isPaused = false;
         
+        // Adjust start time to account for pause duration
+        const pauseDuration = this.audioEngine.audioContext.currentTime - this.pausedTime;
+        this.totalPausedDuration += pauseDuration;
+        
+        // Continue real-time playback
+        this.startRealtimePlayback();
     }
 
     stop() {
         this.isPlaying = false;
-        this.currentPosition = 0;
-        this.scheduledEvents = [];
+        this.isPaused = false;
+        this.currentBeat = 0;
+        this.totalPausedDuration = 0;
         
-        // NEW: actually stop audio
+        // Stop the playback timer
+        if (this.playbackTimer) {
+            clearInterval(this.playbackTimer);
+            this.playbackTimer = null;
+        }
+        
+        // Stop all audio
         this.audioEngine.stopAllNotes();
         
         if (this.onProgressCallback) {
             this.onProgressCallback(0);
         }
-        
     }
 
     pause() {
         this.isPlaying = false;
+        this.isPaused = true;
+        this.pausedTime = this.audioEngine.audioContext.currentTime;
+        
+        // Stop the playback timer but keep current position
+        if (this.playbackTimer) {
+            clearInterval(this.playbackTimer);
+            this.playbackTimer = null;
+        }
+        
+        // Stop currently playing notes but keep position
+        this.audioEngine.stopAllNotes();
     }
 
-    scheduleAllNotes() {
-        this.scheduledEvents = [];
+    prepareNotes() {
+        this.allNotes = [];
         
-        const beatDuration = 60.0 / this.tempo; // seconds per beat
-        let totalBeats = 0;
+        const beatDuration = 60.0 / this.tempo;
+        const totalBeats = this.tabData.measures.length * 4;
+        this.totalDuration = totalBeats * beatDuration;
         
-        // Calculate total composition length (8 measures x 4 beats each = 32 beats)
-        totalBeats = this.tabData.measures.length * 4;
-        
-        // Schedule notes from all measures using global beat position
+        // Collect all notes with timing for real-time triggering
         for (const measure of this.tabData.measures) {
             for (const note of measure.notes) {
                 if (note.fret >= 0) {
-                    // Use global beat position if available, otherwise fall back to beatPosition
                     const globalBeat = note.globalBeatPosition !== undefined ? note.globalBeatPosition : note.beatPosition;
-                    const noteStartTime = globalBeat * beatDuration;
-                    const noteDuration = note.beatDuration * beatDuration;
                     
-                    this.scheduledEvents.push({
-                        noteEvent: note,
-                        startTime: noteStartTime,
-                        duration: noteDuration
+                    this.allNotes.push({
+                        note: note,
+                        beatPosition: globalBeat,
+                        beatDuration: note.beatDuration,
+                        triggered: false
                     });
-                    
-                    // Schedule the note
-                    this.audioEngine.playNote(note, noteStartTime, noteDuration);
                 }
             }
         }
         
-        // Store total duration for progress tracking
-        this.totalDuration = totalBeats * beatDuration;
+        // Sort by beat position
+        this.allNotes.sort((a, b) => a.beatPosition - b.beatPosition);
     }
 
     getMeasureBeats(measure) {
@@ -578,29 +615,65 @@ class TabSequencer {
         return numerator;
     }
 
-    trackProgress() {
-        if (!this.isPlaying) return;
-        
-        const currentTime = this.audioEngine.audioContext.currentTime;
-        const elapsed = currentTime - this.startTime;
-        const progress = Math.min(elapsed / this.totalDuration, 1.0);
-        
-        this.currentPosition = progress;
-        
-        if (this.onProgressCallback) {
-            this.onProgressCallback(progress);
-        }
-        
-        if (progress >= 1.0) {
-            // Playback complete
-            this.isPlaying = false;
-            if (this.onCompleteCallback) {
-                this.onCompleteCallback();
+    startRealtimePlayback() {
+        // Real-time playback with 10ms precision
+        this.playbackTimer = setInterval(() => {
+            if (!this.isPlaying) return;
+            
+            const currentTime = this.audioEngine.audioContext.currentTime;
+            const elapsed = currentTime - this.startTime - this.totalPausedDuration;
+            const beatDuration = 60.0 / this.tempo;
+            this.currentBeat = elapsed / beatDuration;
+            
+            const progress = Math.min(this.currentBeat / (this.totalDuration / beatDuration), 1.0);
+            
+            // Trigger notes that should start now (with 50ms lookahead)
+            const lookahead = 0.05;
+            for (const noteData of this.allNotes) {
+                if (!noteData.triggered && 
+                    this.currentBeat >= noteData.beatPosition - lookahead &&
+                    this.currentBeat <= noteData.beatPosition + lookahead) {
+                    
+                    const noteStartTime = Math.max(0, (noteData.beatPosition - this.currentBeat) * beatDuration);
+                    const noteDuration = noteData.beatDuration * beatDuration;
+                    
+                    this.audioEngine.playNote(noteData.note, noteStartTime, noteDuration);
+                    noteData.triggered = true;
+                }
             }
-            return;
-        }
+            
+            // Update progress
+            if (this.onProgressCallback) {
+                this.onProgressCallback(progress);
+            }
+            
+            // Check for completion
+            if (progress >= 1.0) {
+                if (this.isLooping) {
+                    this.loop();
+                } else {
+                    this.stop();
+                    if (this.onCompleteCallback) {
+                        this.onCompleteCallback();
+                    }
+                }
+            }
+        }, 10);
+    }
+    
+    loop() {
+        // Reset for next loop iteration
+        this.currentBeat = 0;
+        this.startTime = this.audioEngine.audioContext.currentTime;
+        this.totalPausedDuration = 0;
         
-        // Continue tracking
-        requestAnimationFrame(() => this.trackProgress());
+        // Reset all note triggers
+        this.allNotes.forEach(noteData => {
+            noteData.triggered = false;
+        });
+    }
+    
+    setLooping(enabled) {
+        this.isLooping = enabled;
     }
 }

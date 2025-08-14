@@ -10,6 +10,7 @@ class GuitarTabPlayer {
         this.currentTempo = 120;
         this.currentPosition = 0;
         this.currentBeat = 0; // Current beat position for visualization
+        this.isLooping = false;
         
         // Initialize audio system
         this.audioEngine = new GuitarAudioEngine();
@@ -26,6 +27,7 @@ class GuitarTabPlayer {
         this.playPauseBtn = document.getElementById('play-pause-btn');
         this.stopBtn = document.getElementById('stop-btn');
         this.restartBtn = document.getElementById('restart-btn');
+        this.loopBtn = document.getElementById('loop-btn');
         
         this.tempoValue = document.getElementById('tempo-value');
         this.currentTempoSpan = document.getElementById('current-tempo');
@@ -42,6 +44,7 @@ class GuitarTabPlayer {
         this.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
         this.stopBtn.addEventListener('click', () => this.stop());
         this.restartBtn.addEventListener('click', () => this.restart());
+        this.loopBtn.addEventListener('click', () => this.toggleLoop());
         this.tempoUpBtn.addEventListener('click', () => this.adjustTempo(5));
         this.tempoDownBtn.addEventListener('click', () => this.adjustTempo(-5));
     }
@@ -519,11 +522,19 @@ class GuitarTabPlayer {
             alert('Unable to start audio playback. Please check your browser audio settings.');
         }
     }
+    
+    toggleLoop() {
+        this.isLooping = !this.isLooping;
+        this.sequencer.setLooping(this.isLooping);
+        this.loopBtn.textContent = this.isLooping ? 'Loop: On' : 'Loop: Off';
+    }
 
     pause() {
-        // For now, pause acts like stop since we pre-schedule all notes
-        // True pause/resume would require real-time note triggering
-        this.stop();
+        this.isPlaying = false;
+        this.playPauseBtn.textContent = 'Play';
+        document.body.classList.remove('playing');
+        
+        this.sequencer.pause();
     }
 
     stop() {
