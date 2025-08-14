@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guitar Tab Player</title>
+    <link rel="stylesheet" href="css/player.css">
+</head>
+<body>
+    <div class="player-container">
+        <header class="player-header">
+            <h1 id="composition-title">Guitar Tab Player</h1>
+            <div class="tempo-display">
+                <span>Tempo: </span>
+                <span id="tempo-value">120</span>
+                <span> BPM</span>
+            </div>
+        </header>
+
+        <div class="tab-display" id="tab-display">
+            <canvas id="tab-canvas" width="800" height="400"></canvas>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+        </div>
+
+        <div class="playback-controls">
+            <button id="play-pause-btn" class="control-btn primary">Play</button>
+            <button id="stop-btn" class="control-btn">Stop</button>
+            <button id="restart-btn" class="control-btn">Restart</button>
+            
+            <div class="tempo-controls">
+                <button id="tempo-down" class="tempo-btn">-</button>
+                <span id="current-tempo">120</span>
+                <button id="tempo-up" class="tempo-btn">+</button>
+            </div>
+        </div>
+
+        <div class="loading-message" id="loading-message">
+            Loading tab data...
+        </div>
+
+        <div class="error-message" id="error-message" style="display: none;">
+            <h3>Unable to load tab</h3>
+            <p>The shared link appears to be invalid or corrupted.</p>
+        </div>
+    </div>
+
+    <script src="js/decoder.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/player.js"></script>
+</body>
+</html>
