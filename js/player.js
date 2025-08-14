@@ -89,8 +89,8 @@ class GuitarTabPlayer {
                 this.setupFromTabData();
                 this.hideLoading();
             } else {
-                // Load test data for development - try real tab first
-                this.loadRealTabData();
+                // No valid tab data found in URL
+                this.showError('No valid tab data found. Please check your share link.');
             }
             
         } catch (error) {
@@ -99,42 +99,6 @@ class GuitarTabPlayer {
         }
     }
 
-    loadRealTabData() {
-        // Your real "NoMierda" composition
-        const realTabData = {"version": 1, "measures": [{"notes": [{"string": 3, "fret": 6, "subdivision": 0, "duration": 4}, {"string": 4, "fret": 4, "subdivision": 0, "duration": 4}, {"string": 4, "fret": 8, "subdivision": 4, "duration": 12}, {"string": 5, "fret": 6, "subdivision": 4, "duration": 12}], "measureId": 1}, {"notes": [{"string": 3, "fret": 6, "subdivision": 0, "duration": 2}, {"string": 4, "fret": 4, "subdivision": 0, "duration": 2}, {"string": 4, "fret": 8, "subdivision": 2, "duration": 2}, {"string": 4, "fret": 7, "subdivision": 4, "duration": 12}, {"string": 5, "fret": 6, "subdivision": 2, "duration": 2}, {"string": 5, "fret": 5, "subdivision": 4, "duration": 12}], "measureId": 2}, {"notes": [{"string": 3, "fret": 6, "subdivision": 0, "duration": 2}, {"string": 3, "fret": 6, "subdivision": 4, "duration": 4}, {"string": 3, "fret": 7, "subdivision": 14, "duration": 2}, {"string": 4, "fret": 4, "subdivision": 0, "duration": 2}, {"string": 4, "fret": 8, "subdivision": 2, "duration": 2}, {"string": 4, "fret": 4, "subdivision": 4, "duration": 4}, {"string": 4, "fret": 5, "subdivision": 14, "duration": 2}, {"string": 4, "fret": 8, "subdivision": 8, "duration": 6}, {"string": 5, "fret": 6, "subdivision": 2, "duration": 2}, {"string": 5, "fret": 6, "subdivision": 8, "duration": 6}], "measureId": 3}, {"notes": [{"string": 3, "fret": 6, "subdivision": 0, "duration": 2}, {"string": 3, "fret": 6, "subdivision": 8, "duration": 2}, {"string": 4, "fret": 4, "subdivision": 0, "duration": 2}, {"string": 4, "fret": 8, "subdivision": 2, "duration": 2}, {"string": 4, "fret": 7, "subdivision": 4, "duration": 4}, {"string": 4, "fret": 4, "subdivision": 8, "duration": 2}, {"string": 4, "fret": 8, "subdivision": 10, "duration": 2}, {"string": 4, "fret": 7, "subdivision": 12, "duration": 4}, {"string": 5, "fret": 6, "subdivision": 2, "duration": 2}, {"string": 5, "fret": 5, "subdivision": 4, "duration": 4}, {"string": 5, "fret": 6, "subdivision": 10, "duration": 2}, {"string": 5, "fret": 5, "subdivision": 12, "duration": 4}], "measureId": 4}, {"notes": [{"string": 3, "fret": 6, "subdivision": 0, "duration": 2}, {"string": 3, "fret": 6, "subdivision": 4, "duration": 4}, {"string": 4, "fret": 4, "subdivision": 0, "duration": 2}, {"string": 4, "fret": 8, "subdivision": 2, "duration": 2}, {"string": 4, "fret": 4, "subdivision": 4, "duration": 4}, {"string": 4, "fret": 8, "subdivision": 8, "duration": 8}, {"string": 5, "fret": 6, "subdivision": 2, "duration": 2}, {"string": 5, "fret": 6, "subdivision": 8, "duration": 8}], "measureId": 5}, {"notes": [{"string": 3, "fret": 6, "subdivision": 0, "duration": 2}, {"string": 4, "fret": 4, "subdivision": 0, "duration": 2}, {"string": 4, "fret": 8, "subdivision": 2, "duration": 2}, {"string": 4, "fret": 7, "subdivision": 4, "duration": 12}, {"string": 5, "fret": 6, "subdivision": 2, "duration": 2}, {"string": 5, "fret": 5, "subdivision": 4, "duration": 12}], "measureId": 6}, {"notes": [{"string": 3, "fret": 6, "subdivision": 0, "duration": 2}, {"string": 3, "fret": 6, "subdivision": 4, "duration": 4}, {"string": 3, "fret": 7, "subdivision": 14, "duration": 2}, {"string": 4, "fret": 4, "subdivision": 0, "duration": 2}, {"string": 4, "fret": 8, "subdivision": 2, "duration": 2}, {"string": 4, "fret": 4, "subdivision": 4, "duration": 4}, {"string": 4, "fret": 5, "subdivision": 14, "duration": 2}, {"string": 4, "fret": 8, "subdivision": 8, "duration": 6}, {"string": 5, "fret": 6, "subdivision": 2, "duration": 2}, {"string": 5, "fret": 6, "subdivision": 8, "duration": 6}], "measureId": 7}, {"notes": [{"string": 3, "fret": 6, "subdivision": 0, "duration": 2}, {"string": 3, "fret": 6, "subdivision": 8, "duration": 2}, {"string": 4, "fret": 4, "subdivision": 0, "duration": 2}, {"string": 4, "fret": 8, "subdivision": 2, "duration": 2}, {"string": 4, "fret": 7, "subdivision": 4, "duration": 4}, {"string": 4, "fret": 4, "subdivision": 8, "duration": 2}, {"string": 4, "fret": 8, "subdivision": 10, "duration": 2}, {"string": 4, "fret": 7, "subdivision": 12, "duration": 4}, {"string": 5, "fret": 6, "subdivision": 2, "duration": 2}, {"string": 5, "fret": 5, "subdivision": 4, "duration": 4}, {"string": 5, "fret": 6, "subdivision": 10, "duration": 2}, {"string": 5, "fret": 5, "subdivision": 12, "duration": 4}], "measureId": 8}]};
-        
-        // Convert from legacy format to new format
-        this.tabData = this.convertLegacyFormat(realTabData);
-        this.tabData.title = "NoMierda";
-        this.tabData.tempo = 120; // Set a reasonable tempo
-        
-        this.setupFromTabData();
-        this.hideLoading();
-    }
-
-    loadTestData() {
-        // Simple test data (fallback)
-        this.tabData = {
-            version: 2,
-            title: "Test Tab",
-            tempo: 120,
-            measures: [
-                {
-                    timeSignature: "4/4",
-                    keySignature: "C",
-                    notes: [
-                        { string: 0, fret: 3, beatPosition: 0.0, beatDuration: 1.0 },
-                        { string: 0, fret: 5, beatPosition: 1.0, beatDuration: 1.0 },
-                        { string: 1, fret: 2, beatPosition: 2.0, beatDuration: 1.0 },
-                        { string: 2, fret: 0, beatPosition: 3.0, beatDuration: 1.0 }
-                    ]
-                }
-            ]
-        };
-        
-        this.setupFromTabData();
-        this.hideLoading();
-    }
 
     /**
      * Convert legacy subdivision/duration format to beatPosition/beatDuration
