@@ -27,9 +27,18 @@ class TabDataDecoder {
                 return null;
             }
 
-            // Decode base64 and decompress
-            const compressedData = this.base64ToUint8Array(encodedData);
-            const jsonString = await this.decompressData(compressedData);
+            // Decode base64 data
+            const decodedData = this.base64ToUint8Array(encodedData);
+            let jsonString;
+            
+            // Try to decompress first, fall back to treating as uncompressed
+            try {
+                jsonString = await this.decompressData(decodedData);
+            } catch (error) {
+                console.log('Treating data as uncompressed');
+                jsonString = new TextDecoder().decode(decodedData);
+            }
+            
             const tabData = JSON.parse(jsonString);
 
             // Extract additional URL parameters
@@ -132,9 +141,9 @@ class TabDataDecoder {
                 console.warn('Pako decompression also failed:', pakoError);
             }
             
-            // Final fallback: treat as uncompressed
-            console.warn('All decompression failed, treating as uncompressed data');
-            return new TextDecoder().decode(compressedData);
+            // Final fallback: treat as uncompressed and throw error to let caller handle
+            console.warn('All decompression failed');
+            throw new Error('Decompression failed, data may be uncompressed');
         }
     }
 
