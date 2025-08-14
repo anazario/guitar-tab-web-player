@@ -68,14 +68,17 @@ class TabDataDecoder {
 
     /**
      * Decompress gzipped data using browser's DecompressionStream
-     * Falls back to assuming uncompressed data if decompression fails
+     * Falls back to using pako library or assuming uncompressed data
      * @param {Uint8Array} compressedData 
      * @returns {string}
      */
     static async decompressData(compressedData) {
+        console.log('Attempting to decompress data of length:', compressedData.length);
+        
         try {
             // Check if DecompressionStream is supported (modern browsers)
             if (typeof DecompressionStream !== 'undefined') {
+                console.log('Using DecompressionStream');
                 const stream = new DecompressionStream('gzip');
                 const writer = stream.writable.getWriter();
                 const reader = stream.readable.getReader();
@@ -99,15 +102,38 @@ class TabDataDecoder {
                     offset += chunk.length;
                 }
                 
-                return new TextDecoder().decode(decompressed);
+                const result = new TextDecoder().decode(decompressed);
+                console.log('Decompression successful, result length:', result.length);
+                return result;
             } else {
-                // Fallback: assume data is not compressed (for older browsers)
-                console.warn('DecompressionStream not supported, assuming uncompressed data');
+                console.warn('DecompressionStream not supported');
+                // Try to use pako if available (we can add this library later)
+                if (typeof pako !== 'undefined') {
+                    console.log('Using pako for decompression');
+                    const decompressed = pako.inflate(compressedData, { to: 'string' });
+                    return decompressed;
+                }
+                
+                // Last resort: assume data is not compressed
+                console.warn('No decompression available, assuming uncompressed data');
                 return new TextDecoder().decode(compressedData);
             }
         } catch (error) {
-            console.warn('Decompression failed, trying as uncompressed data:', error);
-            // Fallback to treating as uncompressed
+            console.warn('Decompression failed:', error);
+            
+            // Try pako as fallback if available
+            try {
+                if (typeof pako !== 'undefined') {
+                    console.log('Trying pako as fallback');
+                    const decompressed = pako.inflate(compressedData, { to: 'string' });
+                    return decompressed;
+                }
+            } catch (pakoError) {
+                console.warn('Pako decompression also failed:', pakoError);
+            }
+            
+            // Final fallback: treat as uncompressed
+            console.warn('All decompression failed, treating as uncompressed data');
             return new TextDecoder().decode(compressedData);
         }
     }
