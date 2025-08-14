@@ -11,6 +11,9 @@ class GuitarTabPlayer {
         this.currentPosition = 0;
         this.currentBeat = 0; // Current beat position for visualization
         this.isLooping = false;
+        this.loopStartMeasure = 1;
+        this.loopEndMeasure = 8;
+        this.selectedMeasures = new Set(); // For visual selection
         
         // Initialize audio system
         this.audioEngine = new GuitarAudioEngine();
@@ -28,6 +31,9 @@ class GuitarTabPlayer {
         this.stopBtn = document.getElementById('stop-btn');
         this.restartBtn = document.getElementById('restart-btn');
         this.loopBtn = document.getElementById('loop-btn');
+        this.loopStartInput = document.getElementById('loop-start');
+        this.loopEndInput = document.getElementById('loop-end');
+        this.selectAllBtn = document.getElementById('select-all-btn');
         
         this.tempoValue = document.getElementById('tempo-value');
         this.currentTempoSpan = document.getElementById('current-tempo');
@@ -45,8 +51,14 @@ class GuitarTabPlayer {
         this.stopBtn.addEventListener('click', () => this.stop());
         this.restartBtn.addEventListener('click', () => this.restart());
         this.loopBtn.addEventListener('click', () => this.toggleLoop());
+        this.loopStartInput.addEventListener('change', () => this.updateLoopRange());
+        this.loopEndInput.addEventListener('change', () => this.updateLoopRange());
+        this.selectAllBtn.addEventListener('click', () => this.selectAllMeasures());
         this.tempoUpBtn.addEventListener('click', () => this.adjustTempo(5));
         this.tempoDownBtn.addEventListener('click', () => this.adjustTempo(-5));
+        
+        // Add click listener to canvas for measure selection
+        this.tabCanvas.addEventListener('click', (e) => this.handleCanvasClick(e));
     }
 
     setupAudioCallbacks() {
@@ -178,6 +190,13 @@ class GuitarTabPlayer {
         // Setup audio system with tab data
         this.sequencer.setTabData(this.tabData);
         this.sequencer.setTempo(this.currentTempo);
+        
+        // Initialize loop range to all measures
+        this.loopEndMeasure = this.tabData.measures.length;
+        this.loopEndInput.value = this.loopEndMeasure;
+        this.loopEndInput.max = this.loopEndMeasure;
+        this.loopStartInput.max = this.loopEndMeasure;
+        this.updateLoopRange();
 
         // Initialize renderer
         this.renderTab();
@@ -260,8 +279,16 @@ class GuitarTabPlayer {
                 ctx.lineTo(measureX - 5, measureY + (5 * lineSpacing) + 10);
                 ctx.stroke();
                 
+                // Draw measure background if selected for looping AND loop is enabled
+                const measureNumber = measureIndex + 1;
+                const isSelected = this.selectedMeasures.has(measureNumber) && this.isLooping;
+                if (isSelected) {
+                    ctx.fillStyle = 'rgba(0, 255, 0, 0.1)';
+                    ctx.fillRect(measureX - 5, measureY - 15, measureWidth, (5 * lineSpacing) + 25);
+                }
+                
                 // Draw measure number
-                ctx.fillStyle = '#ffffff';
+                ctx.fillStyle = isSelected ? '#00ff00' : '#ffffff';
                 ctx.font = '14px Arial';
                 ctx.textAlign = 'center';
                 ctx.fillText(`${measureIndex + 1}`, measureX + measureWidth/2, measureY - 20);
@@ -526,7 +553,83 @@ class GuitarTabPlayer {
     toggleLoop() {
         this.isLooping = !this.isLooping;
         this.sequencer.setLooping(this.isLooping);
+        this.sequencer.setLoopRange(this.loopStartMeasure, this.loopEndMeasure);
         this.loopBtn.textContent = this.isLooping ? 'Loop: On' : 'Loop: Off';
+        
+        // Re-render to update visual highlighting
+        if (this.tabData) {
+            this.renderTab();
+        }
+    }
+    
+    updateLoopRange() {
+        this.loopStartMeasure = Math.max(1, parseInt(this.loopStartInput.value) || 1);
+        this.loopEndMeasure = Math.min(this.tabData?.measures.length || 8, parseInt(this.loopEndInput.value) || 8);
+        
+        // Ensure start <= end
+        if (this.loopStartMeasure > this.loopEndMeasure) {
+            this.loopEndMeasure = this.loopStartMeasure;
+            this.loopEndInput.value = this.loopEndMeasure;
+        }
+        
+        // Update sequencer
+        this.sequencer.setLoopRange(this.loopStartMeasure, this.loopEndMeasure);
+        
+        // Update selected measures for visual indication
+        this.selectedMeasures.clear();
+        for (let i = this.loopStartMeasure; i <= this.loopEndMeasure; i++) {
+            this.selectedMeasures.add(i);
+        }
+        
+        // Re-render to show selection
+        if (this.tabData) {
+            this.renderTab();
+        }
+    }
+    
+    selectAllMeasures() {
+        this.loopStartMeasure = 1;
+        this.loopEndMeasure = this.tabData?.measures.length || 8;
+        this.loopStartInput.value = this.loopStartMeasure;
+        this.loopEndInput.value = this.loopEndMeasure;
+        this.updateLoopRange();
+    }
+    
+    handleCanvasClick(event) {
+        if (!this.tabData) return;
+        
+        const rect = this.tabCanvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        
+        // Calculate which measure was clicked
+        const measureIndex = this.getMeasureFromClick(x, y);
+        if (measureIndex >= 0 && measureIndex < this.tabData.measures.length) {
+            const measureNumber = measureIndex + 1;
+            
+            // Set loop range to this single measure
+            this.loopStartMeasure = measureNumber;
+            this.loopEndMeasure = measureNumber;
+            this.loopStartInput.value = measureNumber;
+            this.loopEndInput.value = measureNumber;
+            this.updateLoopRange();
+        }
+    }
+    
+    getMeasureFromClick(x, y) {
+        // Use the same layout logic as renderTab
+        const measuresPerRow = 4;
+        const measureWidth = 200;
+        const rowHeight = 180;
+        
+        // Calculate row and measure within row
+        const row = Math.floor((y - 60) / rowHeight);
+        const measureInRow = Math.floor((x - 50) / measureWidth);
+        
+        // Calculate absolute measure index
+        const measureIndex = row * measuresPerRow + measureInRow;
+        
+        return measureIndex;
     }
 
     pause() {

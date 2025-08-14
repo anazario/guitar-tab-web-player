@@ -161,6 +161,36 @@ body {
     color: #ffffff;
 }
 
+.loop-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 20px;
+    background: #333333;
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: 1px solid #555555;
+    font-size: 14px;
+}
+
+.loop-controls label {
+    color: #ffffff;
+    font-weight: 500;
+}
+
+.loop-controls input {
+    background: #555555;
+    border: 1px solid #777777;
+    color: #ffffff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.loop-controls span {
+    color: #cccccc;
+}
+
 .loading-message, .error-message {
     text-align: center;
     padding: 40px;

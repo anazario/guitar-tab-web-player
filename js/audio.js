@@ -484,6 +484,8 @@ class TabSequencer {
         this.onCompleteCallback = null;
         this.isLooping = false;
         this.totalDuration = 0;
+        this.loopStartMeasure = 1;
+        this.loopEndMeasure = 8;
     }
 
     setTabData(tabData) {
@@ -647,33 +649,45 @@ class TabSequencer {
                 this.onProgressCallback(progress);
             }
             
-            // Check for completion
-            if (progress >= 1.0) {
-                if (this.isLooping) {
-                    this.loop();
-                } else {
-                    this.stop();
-                    if (this.onCompleteCallback) {
-                        this.onCompleteCallback();
-                    }
+            // Check for completion of current loop range
+            const loopEndBeat = this.loopEndMeasure * 4;
+            const totalBeats = this.tabData.measures.length * 4;
+            
+            if (this.isLooping && this.currentBeat >= loopEndBeat) {
+                // Loop back to start of selected range
+                this.loop();
+            } else if (!this.isLooping && progress >= 1.0) {
+                // Normal completion
+                this.stop();
+                if (this.onCompleteCallback) {
+                    this.onCompleteCallback();
                 }
             }
         }, 10);
     }
     
     loop() {
-        // Reset for next loop iteration
-        this.currentBeat = 0;
-        this.startTime = this.audioEngine.audioContext.currentTime;
+        // Reset for next loop iteration to start of loop range
+        const loopStartBeat = (this.loopStartMeasure - 1) * 4;
+        this.currentBeat = loopStartBeat;
+        this.startTime = this.audioEngine.audioContext.currentTime - (loopStartBeat * 60.0 / this.tempo);
         this.totalPausedDuration = 0;
         
-        // Reset all note triggers
+        // Reset note triggers only for notes in the loop range
+        const loopEndBeat = this.loopEndMeasure * 4;
         this.allNotes.forEach(noteData => {
-            noteData.triggered = false;
+            if (noteData.beatPosition >= loopStartBeat && noteData.beatPosition < loopEndBeat) {
+                noteData.triggered = false;
+            }
         });
     }
     
     setLooping(enabled) {
         this.isLooping = enabled;
+    }
+    
+    setLoopRange(startMeasure, endMeasure) {
+        this.loopStartMeasure = startMeasure;
+        this.loopEndMeasure = endMeasure;
     }
 }

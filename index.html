@@ -35,6 +35,14 @@
                 <span id="current-tempo">120</span>
                 <button id="tempo-up" class="tempo-btn">+</button>
             </div>
+            
+            <div class="loop-controls">
+                <label>Loop Range:</label>
+                <input type="number" id="loop-start" min="1" max="8" value="1" style="width: 50px;">
+                <span>to</span>
+                <input type="number" id="loop-end" min="1" max="8" value="8" style="width: 50px;">
+                <button id="select-all-btn" class="control-btn">All</button>
+            </div>
         </div>
 
         <div class="loading-message" id="loading-message">
