@@ -352,11 +352,14 @@ class GuitarTabPlayer {
                         // Calculate position within triplet region
                         const regionProgress = (beatPosition - region.startBeat) / (region.endBeat - region.startBeat);
                         
-                        // Calculate pixel positions for region start and end using regular grid
+                        // IMPORTANT: Use regular grid spacing for visual boundaries, not the fractional beat positions
+                        // For 8th note triplets in one beat: visually compressed into 1 beat space on regular grid
                         const regionStartPixel = measureX + (region.startBeat * 4 * subdivisionWidth);
                         const regionEndPixel = measureX + (region.endBeat * 4 * subdivisionWidth);
                         
-                        // Interpolate within the triplet region
+                        console.log(`Triplet positioning: beat=${beatPosition}, region=[${region.startBeat}, ${region.endBeat}], progress=${regionProgress}, pixels=[${regionStartPixel}, ${regionEndPixel}]`);
+                        
+                        // Interpolate within the visually compressed triplet region
                         return regionStartPixel + regionProgress * (regionEndPixel - regionStartPixel);
                     }
                 }
