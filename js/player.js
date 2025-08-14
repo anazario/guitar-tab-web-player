@@ -165,6 +165,7 @@ class GuitarTabPlayer {
                     this.tabData.tripletRegions = {};
                 }
                 this.tabData.tripletRegions[measureIndex] = measure.tripletRegions;
+                console.log(`Measure ${measureIndex} has ${measure.tripletRegions.length} triplet regions:`, measure.tripletRegions);
             }
         }
     }
@@ -303,8 +304,8 @@ class GuitarTabPlayer {
                 // Draw all notes in this measure
                 for (const note of measure.notes) {
                     if (note.fret >= 0) {
-                        const subdivision = Math.round(note.beatPosition * 4); // Convert to subdivision (0-15)
-                        const noteX = measureX + (subdivision * subdivisionWidth);
+                        // Use fractional beat positioning that respects triplet regions
+                        const noteX = this.beatPositionToPixelOffset(note.beatPosition, note.string, measureIndex, measureX, subdivisionWidth);
                         const noteY = measureY + (note.string * lineSpacing);
                         
                         // Draw note background (subtle blue like GuitarTabEditor)
@@ -334,6 +335,39 @@ class GuitarTabPlayer {
     }
 
     /**
+     * Convert beat position to pixel offset, respecting triplet regions
+     * Similar to desktop's TabTrack::beatPositionToPixelOffset
+     */
+    beatPositionToPixelOffset(beatPosition, stringIndex, measureIndex, measureX, subdivisionWidth) {
+        // Check if this beat position is in a triplet region
+        if (this.tabData.tripletRegions && this.tabData.tripletRegions[measureIndex]) {
+            const tripletRegions = this.tabData.tripletRegions[measureIndex];
+            
+            for (const tripletData of tripletRegions) {
+                if (tripletData.stringIndex === stringIndex) {
+                    const region = tripletData.region;
+                    
+                    // Check if beatPosition is within this triplet region
+                    if (beatPosition >= region.startBeat && beatPosition <= region.endBeat) {
+                        // Calculate position within triplet region
+                        const regionProgress = (beatPosition - region.startBeat) / (region.endBeat - region.startBeat);
+                        
+                        // Calculate pixel positions for region start and end using regular grid
+                        const regionStartPixel = measureX + (region.startBeat * 4 * subdivisionWidth);
+                        const regionEndPixel = measureX + (region.endBeat * 4 * subdivisionWidth);
+                        
+                        // Interpolate within the triplet region
+                        return regionStartPixel + regionProgress * (regionEndPixel - regionStartPixel);
+                    }
+                }
+            }
+        }
+        
+        // Not in triplet region - use regular fractional positioning
+        return measureX + (beatPosition * 4 * subdivisionWidth);
+    }
+
+    /**
      * Draw triplet brackets for a measure
      */
     drawTripletBrackets(ctx, measureIndex, measureX, measureY, subdivisionWidth, lineSpacing) {
@@ -345,9 +379,9 @@ class GuitarTabPlayer {
             const stringIndex = tripletData.stringIndex;
             const region = tripletData.region;
             
-            // Calculate bracket position
-            const startX = measureX + (region.startBeat % 1) * 4 * subdivisionWidth;
-            const endX = measureX + (region.endBeat % 1) * 4 * subdivisionWidth;
+            // Calculate bracket position using proper beat positioning
+            const startX = this.beatPositionToPixelOffset(region.startBeat, stringIndex, measureIndex, measureX, subdivisionWidth);
+            const endX = this.beatPositionToPixelOffset(region.endBeat, stringIndex, measureIndex, measureX, subdivisionWidth);
             const bracketY = measureY + (stringIndex * lineSpacing) - 15;
             
             // Draw triplet bracket
@@ -497,14 +531,15 @@ class GuitarTabPlayer {
                     if (this.currentBeat >= noteStart - tolerance && 
                         this.currentBeat <= noteEnd + tolerance) {
                         
-                        // Group by measure and subdivision for chord detection
-                        const subdivision = Math.round(note.beatPosition * 4);
-                        const chordKey = `${measureIndex}-${subdivision}`;
+                        // Group by measure and beat position for chord detection
+                        // Use rounded beat position with higher precision for triplets
+                        const roundedBeatPosition = Math.round(note.beatPosition * 12) / 12; // 12ths precision for triplets
+                        const chordKey = `${measureIndex}-${roundedBeatPosition}`;
                         
                         if (!activeChords[chordKey]) {
                             activeChords[chordKey] = {
                                 measureIndex,
-                                subdivision,
+                                beatPosition: roundedBeatPosition,
                                 notes: []
                             };
                         }
@@ -525,13 +560,17 @@ class GuitarTabPlayer {
      * Draw highlight for a chord (group of notes at same time)
      */
     drawChordHighlight(ctx, chord) {
-        const { measureIndex, subdivision, notes } = chord;
+        const { measureIndex, beatPosition, notes } = chord;
         
         // Calculate screen positions
         const row = Math.floor(measureIndex / this.measuresPerRow);
         const measureInRow = measureIndex % this.measuresPerRow;
+        const measureX = 50 + (measureInRow * this.measureWidth);
         
-        const chordX = 50 + (measureInRow * this.measureWidth) + (subdivision * this.subdivisionWidth);
+        // Use proper beat positioning that respects triplet regions
+        // For highlighting, we can use the first note's string as representative
+        const firstNote = notes[0];
+        const chordX = this.beatPositionToPixelOffset(beatPosition, firstNote.string, measureIndex, measureX, this.subdivisionWidth);
         const baseY = 60 + (row * this.rowHeight) + 30;
         
         if (notes.length === 1) {
