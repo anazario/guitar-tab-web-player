@@ -140,7 +140,39 @@ class GuitarTabPlayer {
         return converted;
     }
 
+    /**
+     * Add globalBeatPosition to notes that don't have it (desktop format)
+     */
+    addGlobalBeatPositions() {
+        if (!this.tabData || !this.tabData.measures) return;
+        
+        for (let measureIndex = 0; measureIndex < this.tabData.measures.length; measureIndex++) {
+            const measure = this.tabData.measures[measureIndex];
+            if (!measure.notes) continue;
+            
+            for (const note of measure.notes) {
+                // Only add if it doesn't already exist
+                if (note.globalBeatPosition === undefined) {
+                    // Calculate global beat position: measure offset + local beat position
+                    note.globalBeatPosition = (measureIndex * 4) + note.beatPosition;
+                }
+            }
+            
+            // Process triplet regions if they exist
+            if (measure.tripletRegions && measure.tripletRegions.length > 0) {
+                // Store triplet regions for this measure
+                if (!this.tabData.tripletRegions) {
+                    this.tabData.tripletRegions = {};
+                }
+                this.tabData.tripletRegions[measureIndex] = measure.tripletRegions;
+            }
+        }
+    }
+
     setupFromTabData() {
+        // Add globalBeatPosition for notes that don't have it (new format from desktop)
+        this.addGlobalBeatPositions();
+        
         // Update UI with tab data
         if (this.tabData.title) {
             this.compositionTitle.textContent = this.tabData.title;
@@ -294,7 +326,59 @@ class GuitarTabPlayer {
                         ctx.fillText(note.fret.toString(), noteX, noteY);
                     }
                 }
+                
+                // Draw triplet brackets if they exist for this measure
+                this.drawTripletBrackets(ctx, measureIndex, measureX, measureY, subdivisionWidth, lineSpacing);
             }
+        }
+    }
+
+    /**
+     * Draw triplet brackets for a measure
+     */
+    drawTripletBrackets(ctx, measureIndex, measureX, measureY, subdivisionWidth, lineSpacing) {
+        if (!this.tabData.tripletRegions || !this.tabData.tripletRegions[measureIndex]) return;
+        
+        const tripletRegions = this.tabData.tripletRegions[measureIndex];
+        
+        for (const tripletData of tripletRegions) {
+            const stringIndex = tripletData.stringIndex;
+            const region = tripletData.region;
+            
+            // Calculate bracket position
+            const startX = measureX + (region.startBeat % 1) * 4 * subdivisionWidth;
+            const endX = measureX + (region.endBeat % 1) * 4 * subdivisionWidth;
+            const bracketY = measureY + (stringIndex * lineSpacing) - 15;
+            
+            // Draw triplet bracket
+            ctx.strokeStyle = '#ffff00'; // Yellow color for visibility
+            ctx.lineWidth = 1;
+            
+            // Bracket line
+            ctx.beginPath();
+            ctx.moveTo(startX, bracketY);
+            ctx.lineTo(endX, bracketY);
+            ctx.stroke();
+            
+            // Left bracket end
+            ctx.beginPath();
+            ctx.moveTo(startX, bracketY);
+            ctx.lineTo(startX, bracketY + 5);
+            ctx.stroke();
+            
+            // Right bracket end
+            ctx.beginPath();
+            ctx.moveTo(endX, bracketY);
+            ctx.lineTo(endX, bracketY + 5);
+            ctx.stroke();
+            
+            // Draw "3" in the middle of the bracket
+            const centerX = (startX + endX) / 2;
+            ctx.fillStyle = '#ffff00';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('3', centerX, bracketY - 2);
         }
     }
 
