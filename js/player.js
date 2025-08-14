@@ -26,6 +26,7 @@ class GuitarTabPlayer {
         this.playPauseBtn = document.getElementById('play-pause-btn');
         this.stopBtn = document.getElementById('stop-btn');
         this.restartBtn = document.getElementById('restart-btn');
+        
         this.tempoValue = document.getElementById('tempo-value');
         this.currentTempoSpan = document.getElementById('current-tempo');
         this.tempoUpBtn = document.getElementById('tempo-up');
@@ -64,7 +65,6 @@ class GuitarTabPlayer {
 
     async loadTabData() {
         try {
-            console.log('Loading tab data from URL...');
             
             // Check if we have URL data
             const urlData = await TabDataDecoder.decodeFromURL();
@@ -73,10 +73,8 @@ class GuitarTabPlayer {
                 this.tabData = urlData;
                 this.setupFromTabData();
                 this.hideLoading();
-                console.log('Tab data loaded successfully:', this.tabData);
             } else {
                 // Load test data for development - try real tab first
-                console.log('No valid URL data found, loading real tab data...');
                 this.loadRealTabData();
             }
             
@@ -97,7 +95,6 @@ class GuitarTabPlayer {
         
         this.setupFromTabData();
         this.hideLoading();
-        console.log('Real tab data loaded: NoMierda');
     }
 
     loadTestData() {
@@ -122,7 +119,6 @@ class GuitarTabPlayer {
         
         this.setupFromTabData();
         this.hideLoading();
-        console.log('Test data loaded');
     }
 
     /**
@@ -162,7 +158,6 @@ class GuitarTabPlayer {
             converted.measures.push(convertedMeasure);
         }
         
-        console.log(`Converted ${legacyData.measures.length} measures from legacy format`);
         return converted;
     }
 
@@ -514,7 +509,6 @@ class GuitarTabPlayer {
             
             // Start audio playback
             await this.sequencer.play();
-            console.log('Audio playback started');
             
         } catch (error) {
             console.error('Failed to start playback:', error);
@@ -522,18 +516,14 @@ class GuitarTabPlayer {
             this.playPauseBtn.textContent = 'Play';
             document.body.classList.remove('playing');
             
-            // Show user-friendly error
             alert('Unable to start audio playback. Please check your browser audio settings.');
         }
     }
 
     pause() {
-        this.isPlaying = false;
-        this.playPauseBtn.textContent = 'Play';
-        document.body.classList.remove('playing');
-        
-        this.sequencer.pause();
-        console.log('Playback paused');
+        // For now, pause acts like stop since we pre-schedule all notes
+        // True pause/resume would require real-time note triggering
+        this.stop();
     }
 
     stop() {
@@ -543,13 +533,14 @@ class GuitarTabPlayer {
         this.playPauseBtn.textContent = 'Play';
         document.body.classList.remove('playing');
         
+        // Stop all active oscillators immediately
+        if (this.audioEngine) {
+            this.audioEngine.stopAllNotes();
+        }
+        
         this.sequencer.stop();
         this.updateProgressBar(0);
-        
-        // Reset visualization to normal rendering
         this.renderTab();
-        
-        console.log('Playback stopped');
     }
 
     restart() {
@@ -586,7 +577,6 @@ class GuitarTabPlayer {
         this.updateProgressBar(0);
         this.renderTab(); // Clear highlights and cursor
         
-        console.log('Playback completed - reset to beginning');
     }
 
     hideLoading() {

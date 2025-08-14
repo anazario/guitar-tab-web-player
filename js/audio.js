@@ -8,7 +8,8 @@ class GuitarAudioEngine {
     constructor() {
         this.audioContext = null;
         this.masterGain = null;
-        this.activeVoices = new Map(); // midiNote -> GuitarVoice
+        this.activeVoices = new Map();
+        this.activeOscillators = new Set();
         this.isInitialized = false;
         
         // Standard guitar tuning (MIDI notes): E4, B3, G3, D3, A2, E2
@@ -35,11 +36,10 @@ class GuitarAudioEngine {
             
             // Create master gain
             this.masterGain = this.audioContext.createGain();
-            this.masterGain.gain.value = 0.3; // Master volume
+            this.masterGain.gain.value = 0.3;
             this.masterGain.connect(this.audioContext.destination);
             
             this.isInitialized = true;
-            console.log('Guitar audio engine initialized');
             
         } catch (error) {
             console.error('Failed to initialize audio:', error);
@@ -80,7 +80,6 @@ class GuitarAudioEngine {
         const actualStartTime = this.audioContext.currentTime + startTime;
         const velocity = 0.8; // Default velocity
         
-        console.log(`Playing note: String ${noteEvent.string}, Fret ${noteEvent.fret}, MIDI ${midiNote}, Start: ${actualStartTime.toFixed(2)}s, Duration: ${duration.toFixed(2)}s`);
         
         // TEST: Use simple oscillator first to verify Web Audio works
         if (false) { // Change to true to test oscillators
@@ -136,8 +135,16 @@ class GuitarAudioEngine {
             oscillator.connect(harmonicGain);
             harmonicGain.connect(mixGain);
             
+            // Track oscillator for emergency stop
+            this.activeOscillators.add(oscillator);
             oscillator.start(startTime);
             oscillator.stop(startTime + duration);
+            
+            // Don't remove from tracking until manually stopped
+            // (so we can call stop() on them if user presses stop)
+            oscillator.addEventListener('ended', () => {
+                this.activeOscillators.delete(oscillator);
+            });
         });
         
         // Create two filters in series for more natural rolloff
@@ -171,18 +178,36 @@ class GuitarAudioEngine {
         vibratoGain.gain.value = frequency * 0.005; // Very subtle pitch modulation
         
         vibrato.connect(vibratoGain);
-        // Connect vibrato to all harmonic oscillators (would need more complex implementation)
+        
+        // Track vibrato oscillator too
+        this.activeOscillators.add(vibrato);
         
         vibrato.start(startTime + 0.1); // Start vibrato after attack
         vibrato.stop(startTime + duration);
         
-        // Connect the audio chain
+        vibrato.addEventListener('ended', () => {
+            this.activeOscillators.delete(vibrato);
+        });
+        
+        // Connect the audio chain through a stoppable gain node
+        const stoppableGain = this.audioContext.createGain();
+        stoppableGain.gain.value = 1.0;
+        
         mixGain.connect(filter1);
         filter1.connect(filter2);
         filter2.connect(envelope);
-        envelope.connect(this.masterGain);
+        envelope.connect(stoppableGain);
+        stoppableGain.connect(this.masterGain);
         
-        console.log(`Realistic guitar note: freq ${frequency.toFixed(1)}Hz, string ${stringIndex}, harmonics: ${harmonics.length}`);
+        // Store the stoppable gain for emergency stop
+        const noteId = `${midiNote}-${startTime}`;
+        this.activeVoices.set(noteId, stoppableGain);
+        
+        // Clean up gain node when note ends
+        setTimeout(() => {
+            this.activeVoices.delete(noteId);
+        }, (duration + 0.5) * 1000);
+        
     }
 
     /**
@@ -207,29 +232,61 @@ class GuitarAudioEngine {
         oscillator.start(startTime);
         oscillator.stop(startTime + duration);
         
-        console.log(`Oscillator note: freq ${frequency.toFixed(1)}Hz`);
     }
 
-    /**
-     * Stop all currently playing notes
-     */
     stopAllNotes() {
-        const currentTime = this.audioContext ? this.audioContext.currentTime : 0;
+        if (!this.audioContext) return;
+        const t = this.audioContext.currentTime;
         
-        for (const voice of this.activeVoices.values()) {
-            voice.stopNote(currentTime);
+        // NEW: hard mute master immediately
+        try {
+            this.masterGain.gain.cancelScheduledValues(t);
+            this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, t);
+            this.masterGain.gain.linearRampToValueAtTime(0.0001, t + 0.01);
+        } catch {}
+        
+        // Stop all active oscillators (even those scheduled in the future)
+        for (const osc of this.activeOscillators) {
+            try { osc.stop(t); } catch {}
         }
+        this.activeOscillators.clear();
         
+        // NEW: zero any per-note gain "bypasses" so tails die instantly
+        for (const g of this.activeVoices.values()) {
+            try {
+                g.gain.cancelScheduledValues(t);
+                g.gain.setValueAtTime(0, t);
+            } catch {}
+        }
         this.activeVoices.clear();
+        
+    }
+
+    emergencyStop() {
+        // Do nothing - stopping will be handled by creating new instances
     }
 
     /**
      * Set master volume (0.0 to 1.0)
      */
     setMasterVolume(volume) {
-        if (this.masterGain) {
-            this.masterGain.gain.value = Math.max(0, Math.min(1, volume));
+        if (this.masterGain && this.audioContext) {
+            const currentTime = this.audioContext.currentTime;
+            this.masterGain.gain.cancelScheduledValues(currentTime);
+            this.masterGain.gain.setValueAtTime(Math.max(0, Math.min(1, volume)), currentTime);
         }
+    }
+    
+    /**
+     * Resume audio context and restore master volume for new playback
+     */
+    async resumeAudio() {
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+            await this.audioContext.resume();
+        }
+        
+        // Restore master volume
+        this.setMasterVolume(0.3);
     }
 }
 
@@ -303,11 +360,9 @@ class GuitarVoice {
         
         this.isPlaying = true;
         
-        console.log(`Started guitar note: MIDI ${midiNote}, freq ${this.baseFrequency.toFixed(1)}Hz, delayLineSize: ${this.delayLineSize}, damping: ${this.dampingFactor}`);
         
         // Debug: Check initial delay line content
         const maxInitial = Math.max(...Array.from(this.delayLine));
-        console.log(`Initial delay line max amplitude: ${maxInitial.toFixed(4)}`);
     }
 
     stopNote(stopTime) {
@@ -383,9 +438,6 @@ class GuitarVoice {
         
         // Debug: Check if we're producing non-zero output
         const maxSample = Math.max(...outputData);
-        if (sample % 1000 === 0 && maxSample > 0.001) {
-            console.log(`Audio output: max sample = ${maxSample.toFixed(4)}`);
-        }
     }
 
     applyWoundStringFilter(input) {
@@ -452,6 +504,9 @@ class TabSequencer {
         
         await this.audioEngine.ensureAudioContext();
         
+        // Restore master volume in case it was muted by stop
+        this.audioEngine.setMasterVolume(0.3);
+        
         this.isPlaying = true;
         this.startTime = this.audioEngine.audioContext.currentTime;
         this.currentPosition = 0;
@@ -462,23 +517,24 @@ class TabSequencer {
         // Start progress tracking
         this.trackProgress();
         
-        console.log(`Started playback at tempo ${this.tempo} BPM`);
     }
 
     stop() {
         this.isPlaying = false;
-        this.audioEngine.stopAllNotes();
         this.currentPosition = 0;
         this.scheduledEvents = [];
+        
+        // NEW: actually stop audio
+        this.audioEngine.stopAllNotes();
         
         if (this.onProgressCallback) {
             this.onProgressCallback(0);
         }
+        
     }
 
     pause() {
         this.isPlaying = false;
-        this.audioEngine.stopAllNotes();
     }
 
     scheduleAllNotes() {
