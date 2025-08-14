@@ -91,6 +91,13 @@ body {
     border-top: 1px solid #555555;
 }
 
+/* Ensure consistent layout on all screen sizes */
+.playback-controls > .control-btn,
+.playback-controls > .tempo-controls,
+.playback-controls > .loop-controls {
+    flex-shrink: 0;
+}
+
 .control-btn {
     padding: 12px 24px;
     border: none;
