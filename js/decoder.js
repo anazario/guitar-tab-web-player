@@ -76,12 +76,31 @@ class TabDataDecoder {
      * @returns {Uint8Array}
      */
     static base64ToUint8Array(base64) {
-        const binaryString = atob(base64);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
+        try {
+            // Clean the base64 string - remove any invalid characters and fix padding
+            let cleanBase64 = base64.replace(/[^A-Za-z0-9+/]/g, '');
+            
+            // Add padding if needed
+            while (cleanBase64.length % 4) {
+                cleanBase64 += '=';
+            }
+            
+            console.log('Original base64 length:', base64.length);
+            console.log('Cleaned base64 length:', cleanBase64.length);
+            console.log('Base64 ends with:', base64.slice(-20));
+            
+            const binaryString = atob(cleanBase64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes;
+        } catch (error) {
+            console.error('Base64 decode error:', error);
+            console.log('Problematic base64 string (first 100 chars):', base64.substring(0, 100));
+            console.log('Problematic base64 string (last 50 chars):', base64.slice(-50));
+            throw new Error('Invalid base64 data: ' + error.message);
         }
-        return bytes;
     }
 
     /**
