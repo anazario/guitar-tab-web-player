@@ -96,8 +96,8 @@ class TabDataDecoder {
         try {
             // Check if DecompressionStream is supported (modern browsers)
             if (typeof DecompressionStream !== 'undefined') {
-                console.log('Using DecompressionStream');
-                const stream = new DecompressionStream('gzip');
+                console.log('Using DecompressionStream with deflate');
+                const stream = new DecompressionStream('deflate');
                 const writer = stream.writable.getWriter();
                 const reader = stream.readable.getReader();
                 
@@ -127,8 +127,8 @@ class TabDataDecoder {
                 console.warn('DecompressionStream not supported');
                 // Try to use pako if available (we can add this library later)
                 if (typeof pako !== 'undefined') {
-                    console.log('Using pako for decompression');
-                    const decompressed = pako.inflate(compressedData, { to: 'string' });
+                    console.log('Using pako for raw deflate decompression');
+                    const decompressed = pako.inflateRaw(compressedData, { to: 'string' });
                     return decompressed;
                 }
                 
@@ -142,8 +142,8 @@ class TabDataDecoder {
             // Try pako as fallback if available
             try {
                 if (typeof pako !== 'undefined') {
-                    console.log('Trying pako as fallback');
-                    const decompressed = pako.inflate(compressedData, { to: 'string' });
+                    console.log('Trying pako raw deflate as fallback');
+                    const decompressed = pako.inflateRaw(compressedData, { to: 'string' });
                     return decompressed;
                 }
             } catch (pakoError) {
