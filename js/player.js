@@ -83,6 +83,12 @@ class GuitarTabPlayer {
         // Mobile browsers need user interaction to unlock audio
         const unlockAudio = async () => {
             try {
+                // Use unmute-ios-audio library to bypass silent mode on iOS
+                if (typeof unmuteAudio === 'function') {
+                    unmuteAudio();
+                    console.log('iOS audio unmuted (silent mode bypass enabled)');
+                }
+                
                 await this.audioEngine.ensureAudioContext();
                 console.log('Mobile audio unlocked successfully');
                 // Remove the event listeners after successful unlock
@@ -96,6 +102,16 @@ class GuitarTabPlayer {
         // Add listeners for first user interaction
         document.addEventListener('touchstart', unlockAudio, { once: true });
         document.addEventListener('click', unlockAudio, { once: true });
+        
+        // Also call unmute early in the page lifecycle for better compatibility
+        if (typeof unmuteAudio === 'function') {
+            try {
+                unmuteAudio();
+                console.log('iOS audio unmute called early');
+            } catch (error) {
+                console.warn('Early unmute failed (normal if no user interaction yet):', error);
+            }
+        }
     }
 
     async loadTabData() {
