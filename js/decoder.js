@@ -93,6 +93,34 @@ class TabDataDecoder {
     static async decompressData(compressedData) {
         console.log('Attempting to decompress data of length:', compressedData.length);
         
+        // Debug: Check what format we actually have
+        console.log('First 4 bytes:', compressedData[0], compressedData[1], compressedData[2], compressedData[3]);
+        console.log('First 4 bytes (hex):', 
+            compressedData[0]?.toString(16).padStart(2, '0'),
+            compressedData[1]?.toString(16).padStart(2, '0'),
+            compressedData[2]?.toString(16).padStart(2, '0'),
+            compressedData[3]?.toString(16).padStart(2, '0')
+        );
+        
+        // Auto-detect compression format
+        if (compressedData[0] === 0x1f && compressedData[1] === 0x8b) {
+            console.log('Detected: gzip format');
+            if (typeof pako !== 'undefined') {
+                const decompressed = pako.ungzip(compressedData, { to: 'string' });
+                console.log('Gzip decompression successful, result length:', decompressed.length);
+                return decompressed;
+            }
+        } else if (compressedData[0] === 0x78 && (compressedData[1] === 0x9c || compressedData[1] === 0x01)) {
+            console.log('Detected: zlib format');
+            if (typeof pako !== 'undefined') {
+                const decompressed = pako.inflate(compressedData, { to: 'string' });
+                console.log('Zlib decompression successful, result length:', decompressed.length);
+                return decompressed;
+            }
+        } else {
+            console.log('Detected: raw DEFLATE or uncompressed data');
+        }
+        
         try {
             // Try pako first since it's more reliable for raw DEFLATE
             if (typeof pako !== 'undefined') {
