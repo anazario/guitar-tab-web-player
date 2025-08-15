@@ -22,6 +22,7 @@ class GuitarTabPlayer {
         this.initializeElements();
         this.setupEventListeners();
         this.setupAudioCallbacks();
+        this.setupMobileAudio();
         this.loadTabData();
     }
 
@@ -76,6 +77,25 @@ class GuitarTabPlayer {
         this.sequencer.setCompleteCallback(() => {
             this.onPlaybackComplete();
         });
+    }
+
+    setupMobileAudio() {
+        // Mobile browsers need user interaction to unlock audio
+        const unlockAudio = async () => {
+            try {
+                await this.audioEngine.ensureAudioContext();
+                console.log('Mobile audio unlocked successfully');
+                // Remove the event listeners after successful unlock
+                document.removeEventListener('touchstart', unlockAudio);
+                document.removeEventListener('click', unlockAudio);
+            } catch (error) {
+                console.warn('Failed to unlock mobile audio:', error);
+            }
+        };
+
+        // Add listeners for first user interaction
+        document.addEventListener('touchstart', unlockAudio, { once: true });
+        document.addEventListener('click', unlockAudio, { once: true });
     }
 
     async loadTabData() {
@@ -623,6 +643,10 @@ class GuitarTabPlayer {
 
     async play() {
         try {
+            // Mobile browsers require user interaction to start audio context
+            // This ensures audio context is resumed on first play interaction
+            await this.sequencer.audioEngine.ensureAudioContext();
+            
             this.isPlaying = true;
             this.playPauseBtn.textContent = 'Pause';
             document.body.classList.add('playing');
@@ -636,7 +660,12 @@ class GuitarTabPlayer {
             this.playPauseBtn.textContent = 'Play';
             document.body.classList.remove('playing');
             
-            alert('Unable to start audio playback. Please check your browser audio settings.');
+            // More user-friendly error message for mobile
+            const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const errorMsg = isMobile ? 
+                'Audio not available on mobile. Please try again or check your device settings.' :
+                'Unable to start audio playback. Please check your browser audio settings.';
+            alert(errorMsg);
         }
     }
     

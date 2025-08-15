@@ -19,7 +19,9 @@ class TabDataDecoder {
 
             const params = new URLSearchParams(fragment);
             const encodedData = params.get('data');
+            const isCompressed = params.get('compressed') === 'true';
             console.log('Encoded data length:', encodedData ? encodedData.length : 'null');
+            console.log('Is compressed:', isCompressed);
             
             if (!encodedData) {
                 console.warn('No data parameter found in URL');
@@ -31,12 +33,19 @@ class TabDataDecoder {
             const decodedData = this.base64ToUint8Array(encodedData);
             let jsonString;
             
-            // Try to decompress first, fall back to treating as uncompressed
-            try {
-                jsonString = await this.decompressData(decodedData);
-            } catch (error) {
-                console.log('Treating data as uncompressed');
+            if (isCompressed) {
+                // Data is marked as compressed, try decompression
+                try {
+                    jsonString = await this.decompressData(decodedData);
+                    console.log('Successfully decompressed data');
+                } catch (error) {
+                    console.warn('Failed to decompress marked compressed data:', error);
+                    throw new Error('Failed to decompress data: ' + error.message);
+                }
+            } else {
+                // Data is uncompressed
                 jsonString = new TextDecoder().decode(decodedData);
+                console.log('Using uncompressed data');
             }
             
             const tabData = JSON.parse(jsonString);
