@@ -94,10 +94,18 @@ class TabDataDecoder {
         console.log('Attempting to decompress data of length:', compressedData.length);
         
         try {
-            // Check if DecompressionStream is supported (modern browsers)
+            // Try pako first since it's more reliable for raw DEFLATE
+            if (typeof pako !== 'undefined') {
+                console.log('Using pako for raw deflate decompression');
+                const decompressed = pako.inflateRaw(compressedData, { to: 'string' });
+                console.log('Pako decompression successful, result length:', decompressed.length);
+                return decompressed;
+            }
+            
+            // Fallback to DecompressionStream if pako not available
             if (typeof DecompressionStream !== 'undefined') {
-                console.log('Using DecompressionStream with deflate');
-                const stream = new DecompressionStream('deflate');
+                console.log('Using DecompressionStream with deflate-raw');
+                const stream = new DecompressionStream('deflate-raw');
                 const writer = stream.writable.getWriter();
                 const reader = stream.readable.getReader();
                 
@@ -121,38 +129,16 @@ class TabDataDecoder {
                 }
                 
                 const result = new TextDecoder().decode(decompressed);
-                console.log('Decompression successful, result length:', result.length);
+                console.log('DecompressionStream successful, result length:', result.length);
                 return result;
-            } else {
-                console.warn('DecompressionStream not supported');
-                // Try to use pako if available (we can add this library later)
-                if (typeof pako !== 'undefined') {
-                    console.log('Using pako for raw deflate decompression');
-                    const decompressed = pako.inflateRaw(compressedData, { to: 'string' });
-                    return decompressed;
-                }
-                
-                // Last resort: assume data is not compressed
-                console.warn('No decompression available, assuming uncompressed data');
-                return new TextDecoder().decode(compressedData);
             }
+            
+            // No decompression available
+            console.warn('No decompression available, assuming uncompressed data');
+            return new TextDecoder().decode(compressedData);
         } catch (error) {
-            console.warn('Decompression failed:', error);
-            
-            // Try pako as fallback if available
-            try {
-                if (typeof pako !== 'undefined') {
-                    console.log('Trying pako raw deflate as fallback');
-                    const decompressed = pako.inflateRaw(compressedData, { to: 'string' });
-                    return decompressed;
-                }
-            } catch (pakoError) {
-                console.warn('Pako decompression also failed:', pakoError);
-            }
-            
-            // Final fallback: treat as uncompressed and throw error to let caller handle
-            console.warn('All decompression failed');
-            throw new Error('Decompression failed, data may be uncompressed');
+            console.warn('All decompression methods failed:', error);
+            throw new Error('Decompression failed: ' + error.message);
         }
     }
 
