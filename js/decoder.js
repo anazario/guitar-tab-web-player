@@ -134,8 +134,9 @@ class TabDataDecoder {
                 console.log('Gzip decompression successful, result length:', decompressed.length);
                 return decompressed;
             }
-        } else if (compressedData[0] === 0x78 && (compressedData[1] === 0x9c || compressedData[1] === 0x01)) {
-            console.log('Detected: zlib format');
+        } else if (compressedData[0] === 0x78) {
+            // 0x78 indicates zlib format (various compression levels)
+            console.log('Detected: zlib format (header: 0x78 0x' + compressedData[1].toString(16) + ')');
             if (typeof pako !== 'undefined') {
                 const decompressed = pako.inflate(compressedData, { to: 'string' });
                 console.log('Zlib decompression successful, result length:', decompressed.length);
