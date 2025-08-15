@@ -83,10 +83,24 @@ class GuitarTabPlayer {
         // Mobile browsers need user interaction to unlock audio
         const unlockAudio = async () => {
             try {
-                // Use unmute-ios-audio library to bypass silent mode on iOS
-                if (typeof unmuteAudio === 'function') {
-                    unmuteAudio();
-                    console.log('iOS audio unmuted (silent mode bypass enabled)');
+                // Manual iOS silent mode bypass using silent audio element
+                const silentAudio = document.getElementById('silent-audio');
+                if (silentAudio) {
+                    silentAudio.volume = 0.01; // Very quiet but not silent
+                    silentAudio.currentTime = 0;
+                    
+                    try {
+                        await silentAudio.play();
+                        console.log('Silent audio started - iOS silent mode should be bypassed');
+                        
+                        // Stop the silent audio after a short delay
+                        setTimeout(() => {
+                            silentAudio.pause();
+                            silentAudio.currentTime = 0;
+                        }, 100);
+                    } catch (silentError) {
+                        console.warn('Silent audio failed to start:', silentError);
+                    }
                 }
                 
                 await this.audioEngine.ensureAudioContext();
@@ -102,16 +116,6 @@ class GuitarTabPlayer {
         // Add listeners for first user interaction
         document.addEventListener('touchstart', unlockAudio, { once: true });
         document.addEventListener('click', unlockAudio, { once: true });
-        
-        // Also call unmute early in the page lifecycle for better compatibility
-        if (typeof unmuteAudio === 'function') {
-            try {
-                unmuteAudio();
-                console.log('iOS audio unmute called early');
-            } catch (error) {
-                console.warn('Early unmute failed (normal if no user interaction yet):', error);
-            }
-        }
     }
 
     async loadTabData() {

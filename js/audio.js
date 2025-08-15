@@ -525,8 +525,13 @@ class TabSequencer {
     startFreshPlayback() {
         this.isPlaying = true;
         this.isPaused = false;
-        this.currentBeat = 0;
-        this.startTime = this.audioEngine.audioContext.currentTime;
+        
+        // Start at beginning of loop range if looping, otherwise start at beginning
+        const startBeat = this.isLooping ? (this.loopStartMeasure - 1) * 4 : 0;
+        this.currentBeat = startBeat;
+        
+        // Adjust start time to account for starting at non-zero beat
+        this.startTime = this.audioEngine.audioContext.currentTime - (startBeat * 60.0 / this.tempo);
         this.totalPausedDuration = 0;
         
         // Prepare notes for real-time triggering
