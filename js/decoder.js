@@ -20,7 +20,7 @@ class TabDataDecoder {
             const params = new URLSearchParams(fragment);
             const encodedData = params.get('data');
             const isCompressed = params.get('compressed') === 'true';
-            console.log('Encoded data length:', encodedData ? encodedData.length : 'null');
+            console.log('Raw encoded data length:', encodedData ? encodedData.length : 'null');
             console.log('Is compressed:', isCompressed);
             
             if (!encodedData) {
@@ -29,8 +29,13 @@ class TabDataDecoder {
                 return null;
             }
 
-            // Decode base64 data
-            const decodedData = this.base64ToUint8Array(encodedData);
+            // URL decode the base64 data (handles +, /, = characters)
+            const urlDecodedData = decodeURIComponent(encodedData);
+            console.log('URL decoded data length:', urlDecodedData.length);
+            console.log('URL decoded data ends with:', urlDecodedData.slice(-20));
+
+            // Decode base64 data (use URL-decoded version)
+            const decodedData = this.base64ToUint8Array(urlDecodedData);
             let jsonString;
             
             if (isCompressed) {
