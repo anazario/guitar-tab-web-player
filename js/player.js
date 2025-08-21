@@ -15,6 +15,9 @@ class GuitarTabPlayer {
         this.loopEndMeasure = 8;
         this.selectedMeasures = new Set(); // For visual selection
         
+        // Setup mobile debugging first
+        this.setupMobileDebug();
+        
         // Initialize audio system
         this.audioEngine = new GuitarAudioEngine();
         this.sequencer = new TabSequencer(this.audioEngine);
@@ -24,6 +27,79 @@ class GuitarTabPlayer {
         this.setupAudioCallbacks();
         this.setupMobileAudio();
         this.loadTabData();
+    }
+
+    setupMobileDebug() {
+        const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+            // Intercept console methods for mobile debugging
+            const debugLog = (level, ...args) => {
+                const debugDiv = document.getElementById('debug-log');
+                if (debugDiv) {
+                    const timestamp = new Date().toLocaleTimeString();
+                    const message = args.map(arg => 
+                        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                    ).join(' ');
+                    
+                    const logEntry = document.createElement('div');
+                    logEntry.innerHTML = `<span style="color: #666">[${timestamp}]</span> <span style="color: ${
+                        level === 'error' ? '#ff6666' : 
+                        level === 'warn' ? '#ffaa00' : 
+                        '#00ff00'
+                    }">${level.toUpperCase()}:</span> ${message}`;
+                    
+                    debugDiv.appendChild(logEntry);
+                    debugDiv.scrollTop = debugDiv.scrollHeight;
+                    
+                    // Show debug console on errors
+                    if (level === 'error') {
+                        document.getElementById('mobile-debug').style.display = 'block';
+                    }
+                }
+            };
+            
+            // Store original console methods
+            const originalConsole = {
+                log: console.log,
+                warn: console.warn,
+                error: console.error
+            };
+            
+            // Override console methods
+            console.log = (...args) => {
+                originalConsole.log(...args);
+                debugLog('log', ...args);
+            };
+            
+            console.warn = (...args) => {
+                originalConsole.warn(...args);
+                debugLog('warn', ...args);
+            };
+            
+            console.error = (...args) => {
+                originalConsole.error(...args);
+                debugLog('error', ...args);
+            };
+            
+            // Add debug toggle button to playback controls
+            setTimeout(() => {
+                const controls = document.querySelector('.playback-controls');
+                if (controls) {
+                    const debugBtn = document.createElement('button');
+                    debugBtn.textContent = 'Debug';
+                    debugBtn.className = 'control-btn';
+                    debugBtn.style.fontSize = '10px';
+                    debugBtn.onclick = () => {
+                        const debugDiv = document.getElementById('mobile-debug');
+                        debugDiv.style.display = debugDiv.style.display === 'none' ? 'block' : 'none';
+                    };
+                    controls.appendChild(debugBtn);
+                }
+            }, 100);
+            
+            console.log('Mobile debug console initialized');
+        }
     }
 
     initializeElements() {
@@ -884,7 +960,35 @@ class GuitarTabPlayer {
     showError(message) {
         this.loadingMessage.style.display = 'none';
         this.errorMessage.style.display = 'block';
-        this.errorMessage.querySelector('p').textContent = message;
+        
+        const errorP = this.errorMessage.querySelector('p');
+        const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+            // Add mobile-specific error context
+            let mobileMessage = message;
+            
+            if (message.includes('compression') || message.includes('decompress')) {
+                mobileMessage += '\n\nMobile browsers may have issues with compressed data. Try sharing without compression or use a shorter composition.';
+            }
+            
+            if (window.location.href.length > 8000) {
+                mobileMessage += '\n\nThe share URL is very long (' + window.location.href.length + ' characters) which may exceed mobile browser limits.';
+            }
+            
+            if (typeof pako === 'undefined') {
+                mobileMessage += '\n\nCompression library failed to load on mobile network.';
+            }
+            
+            errorP.textContent = mobileMessage;
+        } else {
+            errorP.textContent = message;
+        }
+        
+        console.error('Player error:', message);
+        console.log('Mobile browser:', isMobile);
+        console.log('URL length:', window.location.href.length);
+        console.log('Pako available:', typeof pako !== 'undefined');
     }
 }
 

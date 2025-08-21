@@ -53,6 +53,15 @@
             <h3>Unable to load tab</h3>
             <p>The shared link appears to be invalid or corrupted.</p>
         </div>
+        
+        <!-- Mobile debug console -->
+        <div id="mobile-debug" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.9); color: #00ff00; font-family: monospace; font-size: 10px; max-height: 200px; overflow-y: scroll; padding: 10px; z-index: 1000;">
+            <div style="text-align: right; margin-bottom: 5px;">
+                <button onclick="document.getElementById('mobile-debug').style.display='none'" style="background: #ff0000; color: white; border: none; padding: 2px 6px;">Close</button>
+                <button onclick="document.getElementById('debug-log').innerHTML=''" style="background: #666; color: white; border: none; padding: 2px 6px;">Clear</button>
+            </div>
+            <div id="debug-log"></div>
+        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>

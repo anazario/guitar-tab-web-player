@@ -11,10 +11,21 @@ class TabDataDecoder {
     static async decodeFromURL() {
         try {
             const fragment = window.location.hash.substring(1);
+            const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
             console.log('URL fragment:', fragment);
+            console.log('Mobile browser detected:', isMobile);
+            console.log('URL total length:', window.location.href.length);
+            console.log('Fragment length:', fragment.length);
+            
             if (!fragment) {
                 console.warn('No URL fragment found');
                 return null;
+            }
+
+            // Check for mobile URL length limits
+            if (isMobile && window.location.href.length > 8000) {
+                console.warn('URL may exceed mobile browser limits:', window.location.href.length, 'characters');
             }
 
             const params = new URLSearchParams(fragment);
@@ -22,6 +33,8 @@ class TabDataDecoder {
             const isCompressed = params.get('compressed') === 'true';
             console.log('Raw encoded data length:', encodedData ? encodedData.length : 'null');
             console.log('Is compressed:', isCompressed);
+            console.log('Pako library available:', typeof pako !== 'undefined');
+            console.log('DecompressionStream available:', typeof DecompressionStream !== 'undefined');
             
             if (!encodedData) {
                 console.warn('No data parameter found in URL');
@@ -30,27 +43,61 @@ class TabDataDecoder {
             }
 
             // URL decode the base64 data (handles +, /, = characters)
-            const urlDecodedData = decodeURIComponent(encodedData);
-            console.log('URL decoded data length:', urlDecodedData.length);
-            console.log('URL decoded data ends with:', urlDecodedData.slice(-20));
+            let urlDecodedData;
+            try {
+                urlDecodedData = decodeURIComponent(encodedData);
+                console.log('URL decoded data length:', urlDecodedData.length);
+                console.log('URL decoded data ends with:', urlDecodedData.slice(-20));
+            } catch (error) {
+                console.error('Failed to URL decode data:', error);
+                throw new Error('Invalid URL encoding: ' + error.message);
+            }
 
             // Decode base64 data (use URL-decoded version)
-            const decodedData = this.base64ToUint8Array(urlDecodedData);
+            let decodedData;
+            try {
+                decodedData = this.base64ToUint8Array(urlDecodedData);
+                console.log('Base64 decoded to', decodedData.length, 'bytes');
+            } catch (error) {
+                console.error('Failed to decode base64 data:', error);
+                throw new Error('Invalid base64 data: ' + error.message);
+            }
+            
             let jsonString;
             
             if (isCompressed) {
                 // Data is marked as compressed, try decompression
                 try {
+                    // Add extra logging for mobile debugging
+                    console.log('Attempting decompression on mobile:', isMobile);
                     jsonString = await this.decompressData(decodedData);
-                    console.log('Successfully decompressed data');
+                    console.log('Successfully decompressed data, result length:', jsonString.length);
                 } catch (error) {
                     console.warn('Failed to decompress marked compressed data:', error);
-                    throw new Error('Failed to decompress data: ' + error.message);
+                    
+                    // Mobile fallback: try treating as uncompressed data
+                    if (isMobile) {
+                        console.log('Mobile fallback: attempting to treat compressed data as uncompressed');
+                        try {
+                            jsonString = new TextDecoder().decode(decodedData);
+                            console.log('Mobile fallback successful');
+                        } catch (fallbackError) {
+                            console.error('Mobile fallback also failed:', fallbackError);
+                            throw new Error('Decompression failed and mobile fallback failed: ' + error.message);
+                        }
+                    } else {
+                        throw new Error('Failed to decompress data: ' + error.message);
+                    }
                 }
             } else {
                 // Data is uncompressed
-                jsonString = new TextDecoder().decode(decodedData);
-                console.log('Using uncompressed data');
+                try {
+                    jsonString = new TextDecoder().decode(decodedData);
+                    console.log('Using uncompressed data, length:', jsonString.length);
+                } catch (error) {
+                    console.error('Failed to decode uncompressed data:', error);
+                    throw new Error('Failed to decode uncompressed data: ' + error.message);
+                }
             }
             
             const tabData = JSON.parse(jsonString);
@@ -116,6 +163,15 @@ class TabDataDecoder {
      */
     static async decompressData(compressedData) {
         console.log('Attempting to decompress data of length:', compressedData.length);
+        const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        // Check if pako library loaded properly
+        if (typeof pako === 'undefined') {
+            console.error('Pako library not available - this may cause decompression to fail on mobile');
+            if (isMobile) {
+                throw new Error('Compression library not available on mobile browser');
+            }
+        }
         
         // Debug: Check what format we actually have
         console.log('First 4 bytes:', compressedData[0], compressedData[1], compressedData[2], compressedData[3]);
