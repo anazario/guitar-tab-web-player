@@ -210,9 +210,53 @@ class GuitarTabPlayer {
         }
     }
 
+    /**
+     * Setup instrument configuration for version 2 format or infer from data for version 1
+     */
+    setupInstrumentConfig() {
+        const version = this.tabData.version || 1;
+        
+        if (version === 2 && this.tabData.instrumentConfig) {
+            // Version 2: Use instrument configuration from data
+            this.instrumentConfig = this.tabData.instrumentConfig;
+            console.log('Using instrument config from v2 data:', this.instrumentConfig.name);
+            
+            // Store for use in rendering
+            this.stringCount = this.instrumentConfig.strings.length;
+            this.tuning = this.instrumentConfig.strings.map(s => s.name);
+        } else {
+            // Version 1: Infer string count from the data
+            let maxString = 0;
+            for (const measure of this.tabData.measures) {
+                for (const note of measure.notes) {
+                    maxString = Math.max(maxString, note.string);
+                }
+            }
+            
+            this.stringCount = maxString + 1; // Convert from 0-based to count
+            console.log('Inferred', this.stringCount, 'strings from v1 data');
+            
+            // Create generic string names
+            this.tuning = [];
+            for (let i = 0; i < this.stringCount; i++) {
+                this.tuning.push(`S${i + 1}`);
+            }
+            
+            this.instrumentConfig = {
+                name: 'Inferred Instrument',
+                strings: this.tuning.map((name, i) => ({ name, midiNote: 40 + i }))
+            };
+        }
+        
+        console.log('Instrument setup complete:', this.stringCount, 'strings, tuning:', this.tuning);
+    }
+
     setupFromTabData() {
         // Add globalBeatPosition for notes that don't have it (new format from desktop)
         this.addGlobalBeatPositions();
+        
+        // Handle instrument configuration from version 2 format
+        this.setupInstrumentConfig();
         
         // Update UI with tab data
         if (this.tabData.title) {
@@ -270,9 +314,10 @@ class GuitarTabPlayer {
         ctx.textAlign = 'left';
         ctx.fillText(this.tabData.title || 'Guitar Tab', 20, 25);
         
-        const stringCount = 6;
+        // Use dynamic instrument configuration
+        const stringCount = this.stringCount;
         const lineSpacing = 20;
-        const tuning = ['E', 'B', 'G', 'D', 'A', 'E'];
+        const tuning = this.tuning;
         
         // Render each row
         for (let row = 0; row < rowCount; row++) {

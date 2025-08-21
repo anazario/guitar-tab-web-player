@@ -208,6 +208,27 @@ class TabDataDecoder {
             return false;
         }
 
+        // Check version and handle format differences
+        const version = tabData.version || 1;
+        console.log('Tab data version:', version);
+        
+        if (version === 2) {
+            // Version 2 format validation
+            if (!tabData.instrumentConfig) {
+                console.log('Validation failed: version 2 missing instrumentConfig');
+                return false;
+            }
+            
+            // Validate instrument config structure
+            const config = tabData.instrumentConfig;
+            if (!config.name || !config.strings || !Array.isArray(config.strings)) {
+                console.log('Validation failed: invalid instrumentConfig structure');
+                return false;
+            }
+            
+            console.log('Instrument config:', config.name, 'with', config.strings.length, 'strings');
+        }
+
         // Check for required properties
         if (!tabData.measures || !Array.isArray(tabData.measures)) {
             console.log('Validation failed: no measures array');
