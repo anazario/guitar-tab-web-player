@@ -13,7 +13,7 @@ class TabDataDecoder {
             const fragment = window.location.hash.substring(1);
             const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
-            console.log('URL fragment:', fragment);
+            console.log('URL fragment (first 100 chars):', fragment.substring(0, 100));
             console.log('Mobile browser detected:', isMobile);
             console.log('URL total length:', window.location.href.length);
             console.log('Fragment length:', fragment.length);
@@ -28,17 +28,32 @@ class TabDataDecoder {
                 console.warn('URL may exceed mobile browser limits:', window.location.href.length, 'characters');
             }
 
-            const params = new URLSearchParams(fragment);
-            const encodedData = params.get('data');
-            const isCompressed = params.get('compressed') === 'true';
-            console.log('Raw encoded data length:', encodedData ? encodedData.length : 'null');
+            // Manual parsing instead of URLSearchParams to avoid potential issues
+            let encodedData = null;
+            let isCompressed = false;
+            
+            // Parse data parameter manually
+            const dataMatch = fragment.match(/[?&]?data=([^&]*)/);
+            if (dataMatch) {
+                encodedData = dataMatch[1];
+            }
+            
+            // Parse compressed parameter
+            const compressedMatch = fragment.match(/[?&]compressed=([^&]*)/);
+            if (compressedMatch) {
+                isCompressed = compressedMatch[1] === 'true';
+            }
+            
+            console.log('Manually parsed data length:', encodedData ? encodedData.length : 'null');
+            console.log('First 50 chars of encoded data:', encodedData ? encodedData.substring(0, 50) : 'null');
+            console.log('Last 50 chars of encoded data:', encodedData ? encodedData.substring(encodedData.length - 50) : 'null');
             console.log('Is compressed:', isCompressed);
             console.log('Pako library available:', typeof pako !== 'undefined');
             console.log('DecompressionStream available:', typeof DecompressionStream !== 'undefined');
             
             if (!encodedData) {
                 console.warn('No data parameter found in URL');
-                console.log('Available URL params:', [...params.keys()]);
+                console.log('Fragment content:', fragment);
                 return null;
             }
 
@@ -102,15 +117,15 @@ class TabDataDecoder {
             
             const tabData = JSON.parse(jsonString);
 
-            // Extract additional URL parameters
-            const tempo = params.get('tempo');
-            const title = params.get('title');
+            // Extract additional URL parameters manually
+            const tempoMatch = fragment.match(/[?&]tempo=([^&]*)/);
+            const titleMatch = fragment.match(/[?&]title=([^&]*)/);
 
-            if (tempo) {
-                tabData.tempo = parseInt(tempo, 10);
+            if (tempoMatch) {
+                tabData.tempo = parseInt(tempoMatch[1], 10);
             }
-            if (title) {
-                tabData.title = decodeURIComponent(title);
+            if (titleMatch) {
+                tabData.title = decodeURIComponent(titleMatch[1]);
             }
 
             console.log('Successfully decoded tab data:', tabData);
